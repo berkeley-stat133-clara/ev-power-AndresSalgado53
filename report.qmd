@@ -25,12 +25,12 @@ ev_registration_2021_2023 <- read.csv("data/ev-registrations-by-state-2023.csv")
 
 ## **Part 1:** **Defining Research Question**
 
-Chosen Question:
+Chosen Question: How much electricity is made by each source in each state?
 
 ## **Part 2: Data Preparation and Cleaning**
 
 ```{r}
-
+#On data renew 2023 do Uppercaseify for the states and group-by state to get total renewable amounts
 ```
 
 ## **Part 3: Joining / Pivoting Datasets for Analysis**
