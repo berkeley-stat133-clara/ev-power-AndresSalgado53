@@ -10,6 +10,12 @@ format: typst
 ```{r}
 library(tidyverse)
 library(readr)
+library(tidyverse)
+library(readr)
+library(sf)
+library(tigris)
+library(dplyr)
+library(ggplot2)
 
 renew_2021 <- read.csv("data/renew-use-2021.csv")
 renew_2022 <- read.csv("data/renew-use-2022.csv")
