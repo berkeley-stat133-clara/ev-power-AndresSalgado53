@@ -45,12 +45,61 @@ set_names <- function(df) {
 
 total_2022_clean <- set_names(total_2022)
 total_2023_clean <- set_names(total_2023)
+
+summary_generator <- function(df) {
+  df_long <- df |>
+    pivot_longer(
+      cols = -Energy_Source,
+      names_to = "State",
+      values_to = "Usage"
+    )
+  nonrenewable_summary <- df_long |>
+    filter(Energy_Source != "total_renewable") |>
+    group_by(State) |>
+    summarise(Usage = sum(Usage, na.rm = TRUE), .groups = 'drop') |>
+    mutate(Energy_Source = "total_nonrenewable")
+  df_with_totals <- bind_rows(df_long, nonrenewable_summary)
+  total_energy_summary <- df_with_totals |>
+    filter(Energy_Source %in% c("total_renewable", "total_nonrenewable")) |>
+    group_by(State) |>
+    summarise(Total_Energy = sum(Usage, na.rm = TRUE), .groups = 'drop')
+
+  proportion_summary <- df_with_totals |>
+    filter(Energy_Source %in% c("total_renewable", "total_nonrenewable")) |>
+    inner_join(total_energy_summary, by = "State") |>
+    mutate(
+      Usage = Usage / Total_Energy,
+      Energy_Source = paste0("prop_", Energy_Source)
+    ) |>
+    select(-Total_Energy)
+
+  return(
+    bind_rows(df_with_totals, proportion_summary) %>%
+      pivot_wider(
+        names_from = State,
+        values_from = Usage
+      )
+  )
+}
+
+total_2022_final <- summary_generator(total_2022_clean)
+total_2023_final <- summary_generator(total_2023_clean)
 ```
 
 ## **Part 3: Joining / Pivoting Datasets for Analysis**
 
 ```{r}
-
+long_2022 <- total_2022_final |>
+  pivot_longer(cols = -Energy_Source, names_to = "State", values_to = "Usage_2022")
+long_2023 <- total_2023_final |>
+  pivot_longer(cols = -Energy_Source, names_to = "State", values_to = "Usage_2023")
+comparison_data <- inner_join(
+  long_2022,
+  long_2023,
+  by = c("Energy_Source", "State") 
+) |>
+  mutate(Change_2022_2023 = Usage_2023 - Usage_2022) |>
+  select(Energy_Source, State, Usage_2022, Usage_2023, Change_2022_2023)
 ```
 
 ## **Part 4: Mapping Visualization**
