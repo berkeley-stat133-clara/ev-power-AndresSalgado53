@@ -25,12 +25,28 @@ ev_registration_2021_2023 <- read.csv("data/ev-registrations-by-state-2023.csv")
 
 ## **Part 1:** **Defining Research Question**
 
-Chosen Question: How much electricity is made by each source in each state?
+Chosen Question:  What is the share of electricity that comes from clean sources by state?
 
 ## **Part 2: Data Preparation and Cleaning**
 
 ```{r}
-#On data renew 2023 do Uppercaseify for the states and group-by state to get total renewable amounts
+renew_2023$State <- toupper(renew_2023$State)
+renew_2023 <- renew_2023 |>
+    mutate(Renewable_Use_2023 = str_extract(
+    Renewable_Use_2023,
+    "\\d+\\.?\\d*"
+  )) |>
+    mutate(Renewable_Use_2023 = as.numeric(Renewable_Use_2023))
+
+
+renewable_summary <- renew_2023 |>
+  group_by(State, Energy_Source) |>
+  summarise(Total_Use = sum(Renewable_Use_2023, na.rm = TRUE), .groups = 'drop') |>
+  pivot_wider(
+    names_from = State,
+    values_from = Total_Use,
+  ) |>
+  rename(Energy_Source = Energy_Source)
 ```
 
 ## **Part 3: Joining / Pivoting Datasets for Analysis**
