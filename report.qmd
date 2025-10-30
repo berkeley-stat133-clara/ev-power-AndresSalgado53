@@ -10,8 +10,6 @@ format: typst
 ```{r}
 library(tidyverse)
 library(readr)
-library(tidyverse)
-library(readr)
 library(sf)
 library(tigris)
 library(dplyr)
@@ -27,6 +25,7 @@ total_2023 <- read.csv("data/total-use-2023.csv")
 
 av_energy_2021_2023 <- read.csv("data/av-energy-price-2021-2023.csv")
 ev_registration_2021_2023 <- read.csv("data/ev-registrations-by-state-2023.csv")
+
 ```
 
 ## **Part 1:** **Defining Research Question**
@@ -90,7 +89,11 @@ summary_generator <- function(df) {
 
 total_2022_final <- summary_generator(total_2022_clean)
 total_2023_final <- summary_generator(total_2023_clean)
+total_2022_final
+total_2023_final
 ```
+
+Here I just wanted to make some useful summary statistics to work with that would potentially give me insight on what I could do next. I specifically chose to work with the data from 2022 and 2023 as I felt their more recent information would provide a better insight than the 2021 data and so I saw that one as less important.
 
 ## **Part 3: Joining / Pivoting Datasets for Analysis**
 
@@ -106,10 +109,45 @@ comparison_data <- inner_join(
 ) |>
   mutate(Change_2022_2023 = Usage_2023 - Usage_2022) |>
   select(Energy_Source, State, Usage_2022, Usage_2023, Change_2022_2023)
+comparison_data
 ```
+
+The way the data was set up was pretty difficult to work with so I made sure to make the dataset longer rather than wider so I could more easily use the information gathered in the mapping step.
 
 ## **Part 4: Mapping Visualization**
 
 ```{r}
+states_sf <- states(cb = TRUE) |>
+  shift_geometry() 
+map_change_data <- comparison_data |>
+  filter(Energy_Source == "prop_total_renewable") |>
+  select(State, Change_Prop = Change_2022_2023)
 
+map_data_final_change <- states_sf |>
+  filter(!(NAME %in% c("Puerto Rico", "United States Virgin Islands", "Guam", "Commonwealth of the Northern Mariana Islands", "American Samoa"))) |>
+  left_join(map_change_data, by = c("STUSPS" = "State"))
+
+change_map <- ggplot(data = map_data_final_change) +
+  geom_sf(
+    aes(fill = Change_Prop),
+    color = "white",
+    linewidth = 0.5
+  ) +
+  scale_fill_gradient2( #See if you can make it so darker means more intense
+    low = "red",         
+    mid = "lightgrey",
+    high = "darkblue",
+    midpoint = 0
+  ) +
+
+  labs(
+    title ="Change in Renewable Energy Proportion (2022 to 2023)"
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+  
+change_map
 ```
