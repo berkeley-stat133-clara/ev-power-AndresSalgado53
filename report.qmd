@@ -8,27 +8,149 @@ format: typst
 ## **Part 0: libraries**
 
 ```{r}
+library(tidyverse)
+library(readr)
+library(sf)
+library(tigris)
+library(dplyr)
+library(ggplot2)
+
+renew_2021 <- read.csv("data/renew-use-2021.csv")
+renew_2022 <- read.csv("data/renew-use-2022.csv")
+renew_2023 <- read.csv("data/renew-use-2023.csv")
+
+total_2021 <- read.csv("data/total-use-2021.csv")
+total_2022 <- read.csv("data/total-use-2022.csv")
+total_2023 <- read.csv("data/total-use-2023.csv")
+
+av_energy_2021_2023 <- read.csv("data/av-energy-price-2021-2023.csv")
+ev_registration_2021_2023 <- read.csv("data/ev-registrations-by-state-2023.csv")
 
 ```
 
 ## **Part 1:** **Defining Research Question**
 
-Chosen Question:
+Chosen Question:  What is the share of electricity that comes from clean sources by state, and how has that proportion changed over time?
 
 ## **Part 2: Data Preparation and Cleaning**
 
 ```{r}
+new_names <- c(
+    "coal_use",
+    "natural_gas",
+    "petroleum",
+    "nuclear_energy",
+    "total_renewable"
+)
 
+set_names <- function(df) {
+  df$Energy_Source <- new_names
+  return(df)
+}
+
+total_2022_clean <- set_names(total_2022)
+total_2023_clean <- set_names(total_2023)
+
+summary_generator <- function(df) {
+  df_long <- df |>
+    pivot_longer(
+      cols = -Energy_Source,
+      names_to = "State",
+      values_to = "Usage"
+    )
+  nonrenewable_summary <- df_long |>
+    filter(Energy_Source != "total_renewable") |>
+    group_by(State) |>
+    summarise(Usage = sum(Usage, na.rm = TRUE), .groups = 'drop') |>
+    mutate(Energy_Source = "total_nonrenewable")
+  df_with_totals <- bind_rows(df_long, nonrenewable_summary)
+  total_energy_summary <- df_with_totals |>
+    filter(Energy_Source %in% c("total_renewable", "total_nonrenewable")) |>
+    group_by(State) |>
+    summarise(Total_Energy = sum(Usage, na.rm = TRUE), .groups = 'drop')
+
+  proportion_summary <- df_with_totals |>
+    filter(Energy_Source %in% c("total_renewable", "total_nonrenewable")) |>
+    inner_join(total_energy_summary, by = "State") |>
+    mutate(
+      Usage = Usage / Total_Energy,
+      Energy_Source = paste0("prop_", Energy_Source)
+    ) |>
+    select(-Total_Energy)
+
+  return(
+    bind_rows(df_with_totals, proportion_summary) %>%
+      pivot_wider(
+        names_from = State,
+        values_from = Usage
+      )
+  )
+}
+
+total_2022_final <- summary_generator(total_2022_clean)
+total_2023_final <- summary_generator(total_2023_clean)
+total_2022_final
+total_2023_final
 ```
+
+Here I just wanted to make some useful summary statistics to work with that would potentially give me insight on what I could do next. I specifically chose to work with the data from 2022 and 2023 as I felt their more recent information would provide a better insight than the 2021 data and so I saw that one as less important.
 
 ## **Part 3: Joining / Pivoting Datasets for Analysis**
 
 ```{r}
-
+long_2022 <- total_2022_final |>
+  pivot_longer(cols = -Energy_Source, names_to = "State", values_to = "Usage_2022")
+long_2023 <- total_2023_final |>
+  pivot_longer(cols = -Energy_Source, names_to = "State", values_to = "Usage_2023")
+comparison_data <- inner_join(
+  long_2022,
+  long_2023,
+  by = c("Energy_Source", "State") 
+) |>
+  mutate(Change_2022_2023 = Usage_2023 - Usage_2022) |>
+  select(Energy_Source, State, Usage_2022, Usage_2023, Change_2022_2023)
+comparison_data
 ```
+
+The way the data was set up was pretty difficult to work with so I made sure to make the dataset longer rather than wider so I could more easily use the information gathered in the mapping step.
 
 ## **Part 4: Mapping Visualization**
 
+```{r setup-map-data, echo: false, message: false, warning: false, results: hide, cache: true}
+states_sf <- states(cb = TRUE) |>
+  shift_geometry() 
+```
 ```{r}
 
+map_change_data <- comparison_data |>
+  filter(Energy_Source == "prop_total_renewable") |>
+  select(State, Change_Prop = Change_2022_2023)
+
+map_data_final_change <- states_sf |>
+  filter(!(NAME %in% c("Puerto Rico", "United States Virgin Islands", "Guam", "Commonwealth of the Northern Mariana Islands", "American Samoa"))) |>
+  left_join(map_change_data, by = c("STUSPS" = "State"))
+
+change_map <- ggplot(data = map_data_final_change) +
+  geom_sf(
+    aes(fill = Change_Prop),
+    color = "white",
+    linewidth = 0.5
+  ) +
+  scale_fill_gradient2( #See if you can make it so darker means more intense
+    low = "red",         
+    mid = "lightgrey",
+    high = "darkblue",
+    midpoint = 0
+  ) +
+
+  labs(
+    title ="Change in Renewable Energy Proportion (2022 to 2023)"
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+  
+change_map
 ```
