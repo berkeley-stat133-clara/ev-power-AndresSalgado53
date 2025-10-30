@@ -116,10 +116,38 @@ The way the data was set up was pretty difficult to work with so I made sure to 
 
 ## **Part 4: Mapping Visualization**
 
-```{r setup-map-data, echo: false, message: false, warning: false, results: hide, cache: true}
+```{r}
 states_sf <- states(cb = TRUE) |>
   shift_geometry() 
-```
-```{r}
+map_change_data <- comparison_data |>
+  filter(Energy_Source == "prop_total_renewable") |>
+  select(State, Change_Prop = Change_2022_2023)
 
+map_data_final_change <- states_sf |>
+  filter(!(NAME %in% c("Puerto Rico", "United States Virgin Islands", "Guam", "Commonwealth of the Northern Mariana Islands", "American Samoa"))) |>
+  left_join(map_change_data, by = c("STUSPS" = "State"))
+
+change_map <- ggplot(data = map_data_final_change) +
+  geom_sf(
+    aes(fill = Change_Prop),
+    color = "white",
+    linewidth = 0.5
+  ) +
+  scale_fill_gradient2( #See if you can make it so darker means more intense
+    low = "red",         
+    mid = "lightgrey",
+    high = "darkblue",
+    midpoint = 0
+  ) +
+
+  labs(
+    title ="Change in Renewable Energy Proportion (2022 to 2023)"
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+  
+change_map
 ```
